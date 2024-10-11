@@ -6,6 +6,7 @@ import dotenv from "dotenv";
 import session from "express-session";
 import  passport  from "passport";
 import { Strategy } from "passport-local";
+import GoogleStrategy from "passport-google-oauth2";
 
 dotenv.config();
 
@@ -56,6 +57,15 @@ app.get('/login', (req, res) => {
 app.get('/batman', (req, res) => {
     req.isAuthenticated() ? res.render('batman.ejs') : res.redirect('/login');
 });
+
+app.get('/auth/google', passport.authenticate('google', {
+    scope: ['email', 'profile']
+}));
+
+app.get('/auth/google/gradit', passport.authenticate('google', {
+    successRedirect: '/batman',
+    failureRedirect: '/login'
+}));
 
 // POST ROUTES
 
@@ -111,21 +121,35 @@ passport.use("local",new Strategy(
     }
 ));
 
+passport.use("google", new GoogleStrategy({
+    clientID: process.env.GOOGLE_CLIENT_ID,
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET,
+    callbackURL: process.env.GOOGLE_CALLBACK_URL,
+},
+    async (accessToken, refreshToken, profile, cb) => {
+        try{
+            const queryCheck = `SELECT * FROM users WHERE email = '${profile.email}'`;
+            const resultCheck = await db.query(queryCheck);
+            if (resultCheck.rows.length > 0) {
+                return cb(null, resultCheck.rows[0]);
+            }
+            const query = `INSERT INTO users (email,password) VALUES ('${profile.email}','google') RETURNING *`;
+            const result = await db.query(query);
+            const user = result.rows[0];
+            return cb(null, user);
+        }catch(err){
+            console.log(err);
+        }
+    }
+));
+
 passport.serializeUser((user, cb) => {
-    cb(null, user.id);
+    cb(null, user);
 });
 
-passport.deserializeUser(async (id, cb) => {
-    try{
-        const query = `SELECT * FROM users WHERE id = ${id}`;
-        const result = await db.query(query);
-        const user = result.rows[0];
-        cb(null, user);
-    }catch(err){
-        console.log(err);
-    }
-}
-);
+passport.deserializeUser((user, cb) => {
+    cb(null, user);
+});
 
 app.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
