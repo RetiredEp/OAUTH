@@ -31,14 +31,12 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 const db = new pg.Client({
-    user: process.env.DB_USER,
-    password: process.env.DB_PASS,
-    database: process.env.DB_NAME,
-    host: process.env.DB_HOST,
-    port: process.env.DB_PORT,
+    connectionString: process.env.DATABASE_URL,
 });
 
-db.connect();
+db.connect()
+    .then(() => console.log('Connected to the database'))
+    .catch(err => console.error('Connection error', err.stack));
 
 // GET ROUTES
 
